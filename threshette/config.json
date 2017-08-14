@@ -1,0 +1,11 @@
+{
+  "host": "irc.synirc.net",
+  "port": 6667,
+  "nick": "Threshette",
+  "ident": "threshette",
+  "realname": "Threshette",
+  "registered": true,
+  "channels": [
+    "#()"
+  ]
+}
