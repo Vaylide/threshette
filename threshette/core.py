@@ -9,11 +9,14 @@ import os
 import random
 
 threshette = irc.Threshette("config.json")
-threshette.connect()
+threshette.start()
 
 while 1:
-    text = threshette.get_message()
-    print(text)
+    threshette.get_message()
+    print(threshette.mailbox)
 
-    if "PRIVMSG #()" in text and "hello" in text:
-        threshette.privmsg("#()", "Hello!")
+    if "PRIVMSG #()" in threshette.mailbox:
+        if "hello" in threshette.mailbox:
+            threshette.privmsg("#()", "Hello!")
+        if "!quit" in threshette.mailbox:
+            threshette.stop()

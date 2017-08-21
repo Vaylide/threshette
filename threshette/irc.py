@@ -1,99 +1,99 @@
-"""
-The irc module of Threshette powers the bot by defining a series of basic
-functions the `Threshette` class (a generic bot class) performs: these are less
-to do with actual commands it can perform and more to do with the bare
-necessities of IRC connection.
-
-TODO: Reformat this code in an Actor-based format.
+"""This module defines the main Threshette class, which is used to create a bot.
 """
 
+import getpass
 import json
 import socket
 
 class Threshette:
     def __init__(self, config_path):
         """
-        Reads the config file at `config_path` for the information needed by the
-        bot, and initialises it.
+        Reads the config file stored at `config_path` for the information needed
+        to configure the bot, and initialises it.
         """
 
+        # Defines the mailbox of the Actor
+        self.mailbox = ""
+
+        # Defines the starting state of the Actor
         self.authed = False
-        self.config = json.load(open(config_path))
+        with open(config_path) as f:
+            self.config = json.load(f)
 
-        self.host = self.config["host"]
-        self.port = self.config["port"]
-        self.nick = self.config["nick"]
-        self.ident = self.config["ident"]
-        self.realname = self.config["realname"]
-        self.registered = self.config["registered"]
+        # Uses the `config` file to provide start values
+        self.host = self.config['host']
+        self.port = self.config['port']
+        self.nick = self.config['nick']
+        self.ident = self.config['ident']
+        self.realname = self.config['realname']
+        self.registered = self.config['registered']
 
-        self.channels = self.config["channels"]
+        self.channels = self.config['channels']
 
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Stop values
+        self.quit = self.config['quit']
 
-    # Convenience Functions
+        self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def send(self, message):
         """
         Accepts a `str` argument and turns it into a properly formatted raw IRC
         message by appending carriage returns, encoding `str` to `bytes`, etc.
         """
-        self.sock.send((message + "\r\n").encode())
+        self.irc.send((message + '\r\n').encode())
 
     def privmsg(self, target, message):
         """
-        Convenience function that eliminates a lot of the boilerplate of sending
-        PRIVMSGs -- seeing as this is a bot we're going to be doing a lot of
-        that, so may as well refactor repetition before it sets in.
+        A convenience function that makes it easier to send PRIVMSGs without
+        having to type out the corresponding `send` instrunction.
         """
-        self.send("PRIVMSG {} {}".format(target, message))
+        self.send('PRIVMSG {} {}'.format(target, message))
 
-    # Event Handlers
-
-    def on_connect(self):
+    def start(self):
         """
-        Whatever needs to be performed after you've successfully authed with the
-        network. This includes things like PRIVMSGs, which won't work until you
-        get a message beginning with 001 (at least on SynIRC.)
+        Performs the bare minimum to start up the bot actor, i.e. sending a USER
+        and NICK message.
         """
-        if self.registered:
-            self.privmsg("NickServ", "IDENTIFY {}".format(self.PASSWORD))
-
-        for channel in self.channels:
-            print("Joining {}".format(channel))
-            self.send("JOIN {}".format(channel))
-
-    def on_message(self, message):
-
-        if message.find("PING") != -1:
-            self.send("PONG {}".format(message.split(" ")[1]))
-
-    # Initialise Actor
-
-    def connect(self):
-        """
-        Performs the bare minimum needed to successfully connect to IRC, i.e.
-        sending a NICK and USER message.
-        """
-        print("Connecting to {} at port {}.".format(self.host, self.port))
+        print("Connecting to {} at port {}".format(self.host, self.port))
 
         if self.registered:
-            self.PASSWORD = ""
+            self.PASSWORD = ''
             while not self.PASSWORD:
-                self.PASSWORD = input("Nick is registered. Password: ")
+                self.PASSWORD = getpass.getpass()
         else:
-            print("WARNING: Unregistered nick may lead to clashes.")
+            print('WARNING: Unregistered nick may lead to clashes.')
 
-        self.sock.connect((self.host, self.port))
-        self.send("USER {} {} {} {}".format(
+        self.irc.connect((self.host, self.port))
+        self.send('USER {} {} {} {}'.format(
             self.nick,
             self.host,
             self.ident,
             self.realname
         ))
-        self.send("NICK {}".format(self.nick))
+        self.send('NICK {}'.format(self.nick))
 
-    # Listen to Events
+    def on_start(self):
+        """
+        Defines a set of actions to be taken when the bot has successfully
+        connected to IRC, here defined as "has received an 001 message from the
+        server".
+        """
+        if self.registered:
+            self.privmsg('NickServ', 'IDENTIFY {}'.format(self.PASSWORD))
+
+        for channel in self.channels:
+            self.send('JOIN {}'.format(channel))
+
+    def stop(self):
+        """
+        Stops the bot actor, by sending a QUIT message to the IRC server and
+        then ending the program.
+        """
+        print('Quitting from {}'.format(self.host))
+
+        self.send('QUIT {}'.format(self.quit))
+        self.irc.shutdown(SHUT_RDWR)
+        self.irc.close()
 
     def get_message(self):
         """
@@ -101,12 +101,18 @@ class Threshette:
         interpreted as UTF-8-encoded data. Also handles `initialise` and
         returning PINGs where necessary.
         """
-        text = self.sock.recv(2040).decode()
+        self.mailbox = self.irc.recv(2040).decode()
 
-        if not self.authed and text.find("001") != -1:
-            self.initialise()
+        if not self.authed and self.mailbox.find('001') != -1:
+            self.on_start()
             self.authed = True
 
-        on_message()
+        self.on_message()
 
-        return text
+    def on_message(self):
+        """
+        Defines the actions that the bot object should take when it receives
+        a message.
+        """
+        if self.mailbox.find('PING') != -1:
+            self.send('PONG {}'.format(self.mailbox.split(' ')[1]))
