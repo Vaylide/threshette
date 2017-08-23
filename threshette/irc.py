@@ -35,6 +35,8 @@ class Threshette:
 
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+    ### Convenience Functions
+
     def send(self, message):
         """
         Accepts a `str` argument and turns it into a properly formatted raw IRC
@@ -48,6 +50,8 @@ class Threshette:
         having to type out the corresponding `send` instrunction.
         """
         self.send('PRIVMSG {} {}'.format(target, message))
+
+    ### Start/Stop
 
     def start(self):
         """
@@ -95,6 +99,8 @@ class Threshette:
         self.irc.shutdown(SHUT_RDWR)
         self.irc.close()
 
+    ### Get Message
+
     def get_message(self):
         """
         Reads a message from the server, up to 2040 bytes in length and
@@ -102,12 +108,15 @@ class Threshette:
         returning PINGs where necessary.
         """
         self.mailbox = self.irc.recv(2040).decode()
+        print(self.mailbox[:-1])
 
         if not self.authed and self.mailbox.find('001') != -1:
             self.on_start()
             self.authed = True
 
         self.on_message()
+
+    ### On Message
 
     def on_message(self):
         """
@@ -116,3 +125,22 @@ class Threshette:
         """
         if self.mailbox.find('PING') != -1:
             self.send('PONG {}'.format(self.mailbox.split(' ')[1]))
+
+    ### Operation
+
+    def run(self):
+        """
+        The function that gets the bot actually running, 
+        """
+        self.start()
+
+        while True:
+            self.get_message()
+
+            if "PRIVMSG #()" in self.mailbox:
+                if "hello" in self.mailbox:
+                    self.privmsg("#()", "Hello!")
+                if "!quit" in self.mailbox:
+                    break
+
+        self.stop()

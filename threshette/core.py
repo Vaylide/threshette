@@ -13,7 +13,6 @@ threshette.start()
 
 while 1:
     threshette.get_message()
-    print(threshette.mailbox)
 
     if "PRIVMSG #()" in threshette.mailbox:
         if "hello" in threshette.mailbox:
